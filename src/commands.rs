@@ -1,6 +1,7 @@
 //! Tauri command bridge to `twinpics_core` (stable UI contract via `invoke`).
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -204,6 +205,24 @@ pub async fn list_indices() -> Result<Vec<IndexSummary>, String> {
     Ok(out)
 }
 
+/// Returns true if at least `throttle_ms` has passed since the last successful claim (CAS).
+fn throttle_allow(last_emit_ms: &AtomicU64, throttle_ms: u64) -> bool {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let mut prev = last_emit_ms.load(Ordering::Relaxed);
+    loop {
+        if prev != 0 && now.saturating_sub(prev) < throttle_ms {
+            return false;
+        }
+        match last_emit_ms.compare_exchange_weak(prev, now, Ordering::AcqRel, Ordering::Relaxed) {
+            Ok(_) => return true,
+            Err(p) => prev = p,
+        }
+    }
+}
+
 fn add_index_work(
     app: tauri::AppHandle,
     folder: String,
@@ -216,9 +235,13 @@ fn add_index_work(
         .map_err(|e| format!("path: {e}"))?;
     let paths = project_paths_for_source(&source).map_err(|e: twinpics_core::CoreError| e.to_string())?;
     let app_for_cb = app.clone();
-    use std::time::{Duration, Instant};
-    let last_file_emit: Arc<Mutex<Instant>> = Arc::new(Mutex::new(Instant::now()));
+    let last_file_emit_ms = Arc::new(AtomicU64::new(0));
+    let throttle_ms = 100u64;
     let cb: ProgressCallback = Arc::new(move |p: IndexProgress| {
+        match &p {
+            IndexProgress::FileDiscovered { .. } | IndexProgress::FileStarted { .. } => return,
+            _ => {}
+        }
         let always = matches!(
             p,
             IndexProgress::Scanning
@@ -226,12 +249,8 @@ fn add_index_work(
                 | IndexProgress::Finishing
                 | IndexProgress::Done
         );
-        if !always {
-            let mut t = last_file_emit.lock().unwrap();
-            if t.elapsed() < Duration::from_millis(100) {
-                return;
-            }
-            *t = Instant::now();
+        if !always && !throttle_allow(last_file_emit_ms.as_ref(), throttle_ms) {
+            return;
         }
         if let Some(dto) = index_progress_to_event(&p) {
             let _ = app_for_cb.emit("twinpics://index-progress", &dto);

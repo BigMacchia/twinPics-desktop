@@ -21,3 +21,39 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 twinpics_core = { path = "../core", features = ["model-download", "pdf"] }
 base64 = "0.22"
+
+# ── Dev-profile optimisation for ML-heavy dependencies ─────────────────────
+# This crate is excluded from the root workspace so it owns its own profiles.
+# Without overrides, tauri dev compiles at opt-level=0, making Candle CPU
+# tensor ops 10-100x slower than the CLI release build.
+#
+# Strategy:
+#   opt-level=1 globally: minimal compile overhead, enables auto-vectorisation
+#   opt-level=3 on the 6 ML-critical crates: closes the gap to release speed
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package.candle-core]
+opt-level = 3
+codegen-units = 1
+
+[profile.dev.package.candle-nn]
+opt-level = 3
+codegen-units = 1
+
+[profile.dev.package.candle-transformers]
+opt-level = 3
+codegen-units = 1
+
+[profile.dev.package.twinpics_core]
+opt-level = 3
+codegen-units = 1
+
+[profile.dev.package.image]
+opt-level = 3
+codegen-units = 1
+
+[profile.dev.package.rayon]
+opt-level = 3
+codegen-units = 1
