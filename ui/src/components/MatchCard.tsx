@@ -106,6 +106,23 @@ export function MatchCard({ hit }: Props) {
             p. {hit.pdfPage + 1}
           </div>
         )}
+
+        {/* Color palette strip — bottom, color-search results only */}
+        {hit.palette && hit.palette.length > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 flex h-4 overflow-hidden">
+            {hit.palette.map((c, idx) => (
+              <div
+                key={idx}
+                style={{
+                  backgroundColor: `rgb(${c.r},${c.g},${c.b})`,
+                  flexBasis: `${c.pct * 100}%`,
+                  flexShrink: 0,
+                }}
+                title={`rgb(${c.r},${c.g},${c.b}) · ${(c.pct * 100).toFixed(0)}%`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Context menu */}

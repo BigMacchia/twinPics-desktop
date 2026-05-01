@@ -8,8 +8,8 @@ use twinpics_core::ml::{CandleClipBackend, EmbeddingBackend};
 use tauri::Emitter;
 use twinpics_core::{
     index_folder, list_projects, list_tag_counts, project_artefact_paths, project_paths_for_source,
-    search_project_image, search_project_text, IndexOptions, IndexProgress, Manifest, ProgressCallback,
-    ProjectConfig, SearchParams,
+    search_project_colors, search_project_image, search_project_text, DominantColor, IndexOptions,
+    IndexProgress, Manifest, ProgressCallback, ProjectConfig, SearchParams,
 };
 
 /// Progress payload for the `twinpics://index-progress` event (align with frontend `IndexProgressEvent`).
@@ -134,6 +134,30 @@ pub struct TagCountDto {
     pub count: usize,
 }
 
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorEntryDto {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub pct: f32,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorHitDto {
+    pub rank: usize,
+    pub score: f32,
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pdf_page: Option<u32>,
+    pub palette: Vec<ColorEntryDto>,
+}
+
+fn dominant_to_dto(c: &DominantColor) -> ColorEntryDto {
+    ColorEntryDto { r: c.r, g: c.g, b: c.b, pct: c.pct }
+}
+
 fn list_index_tags_work(source_path: String) -> Result<Vec<TagCountDto>, String> {
     let paths = project_paths_for_source(Path::new(&source_path))
         .map_err(|e: twinpics_core::CoreError| e.to_string())?;
@@ -192,7 +216,23 @@ fn add_index_work(
         .map_err(|e| format!("path: {e}"))?;
     let paths = project_paths_for_source(&source).map_err(|e: twinpics_core::CoreError| e.to_string())?;
     let app_for_cb = app.clone();
+    use std::time::{Duration, Instant};
+    let last_file_emit: Arc<Mutex<Instant>> = Arc::new(Mutex::new(Instant::now()));
     let cb: ProgressCallback = Arc::new(move |p: IndexProgress| {
+        let always = matches!(
+            p,
+            IndexProgress::Scanning
+                | IndexProgress::Discovered { .. }
+                | IndexProgress::Finishing
+                | IndexProgress::Done
+        );
+        if !always {
+            let mut t = last_file_emit.lock().unwrap();
+            if t.elapsed() < Duration::from_millis(100) {
+                return;
+            }
+            *t = Instant::now();
+        }
         if let Some(dto) = index_progress_to_event(&p) {
             let _ = app_for_cb.emit("twinpics://index-progress", &dto);
         }
@@ -333,6 +373,52 @@ pub async fn search_by_text(
     let backend = state.backend()?;
     tokio::task::spawn_blocking(move || {
         search_by_text_work(source_path, tags, min_score, top_k, backend)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn search_by_colors_work(
+    source_path: String,
+    colors: Vec<[u8; 3]>,
+    tolerance: f32,
+    min_score: f32,
+    top_k: usize,
+) -> Result<Vec<ColorHitDto>, String> {
+    let paths = project_paths_for_source(Path::new(&source_path))
+        .map_err(|e: twinpics_core::CoreError| e.to_string())?;
+    let hits = search_project_colors(
+        &paths,
+        &colors,
+        tolerance,
+        SearchParams {
+            min_score,
+            output_max: top_k,
+        },
+    )
+    .map_err(|e: twinpics_core::CoreError| e.to_string())?;
+    Ok(hits
+        .into_iter()
+        .map(|h| ColorHitDto {
+            rank: h.rank,
+            score: h.score,
+            path: h.path.to_string_lossy().to_string(),
+            pdf_page: h.pdf_page,
+            palette: h.palette.iter().map(dominant_to_dto).collect(),
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn search_by_colors(
+    source_path: String,
+    colors: Vec<[u8; 3]>,
+    tolerance: f32,
+    min_score: f32,
+    top_k: usize,
+) -> Result<Vec<ColorHitDto>, String> {
+    tokio::task::spawn_blocking(move || {
+        search_by_colors_work(source_path, colors, tolerance, min_score, top_k)
     })
     .await
     .map_err(|e| e.to_string())?

@@ -47,12 +47,22 @@ export type IndexProgressEvent =
   | { kind: "finishing" }
   | { kind: "done" };
 
+export type ColorPaletteEntry = {
+  r: number;
+  g: number;
+  b: number;
+  /** Fraction of image pixels in this cluster (0.0–1.0). */
+  pct: number;
+};
+
 export type SearchHit = {
   rank: number;
   score: number;
   path: string;
   /** 0-based page index; present only for PDF results. */
   pdfPage?: number;
+  /** Dominant colors — present only for color-search results. */
+  palette?: ColorPaletteEntry[];
 };
 
 export type IndexTagItem = {
@@ -93,6 +103,13 @@ export interface TwinpicsClient {
   writeTempImage(bytes: Uint8Array): Promise<string>;
   removeIndex(args: { sourcePath: string }): Promise<void>;
   removeAllIndices(): Promise<void>;
+  searchByColors(args: {
+    sourcePath: string;
+    colors: [number, number, number][];
+    tolerance: number;
+    minScore: number;
+    topK: number;
+  }): Promise<SearchHit[]>;
 }
 
 async function writeTempImageB64(bytes: Uint8Array): Promise<string> {
@@ -122,4 +139,12 @@ export const liveTwinpicsClient: TwinpicsClient = {
   writeTempImage: (bytes) => writeTempImageB64(bytes),
   removeIndex: ({ sourcePath }) => invoke("remove_index", { sourcePath }),
   removeAllIndices: () => invoke("remove_all_indices"),
+  searchByColors: (args) =>
+    invoke("search_by_colors", {
+      sourcePath: args.sourcePath,
+      colors: args.colors,
+      tolerance: args.tolerance,
+      minScore: args.minScore,
+      topK: args.topK,
+    }),
 };

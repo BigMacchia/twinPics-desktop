@@ -1,5 +1,6 @@
 import { SearchByImageTab } from "@/components/tabs/SearchByImageTab";
 import { SearchByTextTab } from "@/components/tabs/SearchByTextTab";
+import { SearchByColorTab } from "@/components/tabs/SearchByColorTab";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchSettings, type SearchTab } from "@/context/SearchSettingsContext";
@@ -14,8 +15,8 @@ export function CentralPanel() {
           Image match
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Find similar images in your index — by reference photo or by text
-          description.
+          Find similar images in your index — by reference photo, text
+          description, or color palette.
         </p>
       </header>
 
@@ -27,7 +28,7 @@ export function CentralPanel() {
         >
           <TabsList
             className={cn(
-              "mb-6 grid h-auto w-full max-w-md grid-cols-2 gap-1 rounded-2xl bg-muted/50 p-1.5",
+              "mb-6 mx-auto grid h-auto w-full max-w-xl grid-cols-3 gap-1 rounded-2xl bg-muted/50 p-1.5",
             )}
           >
             <TabsTrigger
@@ -50,6 +51,16 @@ export function CentralPanel() {
             >
               Search by text
             </TabsTrigger>
+            <TabsTrigger
+              value="color"
+              className={cn(
+                "rounded-xl py-2.5 text-sm data-[state=active]:bg-primary/15",
+                "data-[state=active]:text-primary data-[state=active]:shadow-sm",
+                "data-[state=active]:ring-1 data-[state=active]:ring-primary/30",
+              )}
+            >
+              Search by color
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent
@@ -65,6 +76,13 @@ export function CentralPanel() {
             className="mt-0 data-[state=inactive]:hidden"
           >
             <SearchByTextTab />
+          </TabsContent>
+          <TabsContent
+            value="color"
+            forceMount
+            className="mt-0 data-[state=inactive]:hidden"
+          >
+            <SearchByColorTab />
           </TabsContent>
         </Tabs>
       </div>

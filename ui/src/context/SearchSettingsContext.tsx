@@ -8,10 +8,11 @@ import {
 
 export const DEFAULT_UI_TOP_K = 10;
 export const DEFAULT_UI_MIN_SCORE = 0.3;
+export const DEFAULT_COLOR_MIN_SCORE = 0.08;
 export const OVERFETCH_TOP_K = 20;
 export const OVERFETCH_MIN_SCORE = 0.25;
 
-export type SearchTab = "image" | "text";
+export type SearchTab = "image" | "text" | "color";
 
 type Ctx = {
   activeTab: SearchTab;
@@ -24,6 +25,10 @@ type Ctx = {
   setTextTopK: (value: number) => void;
   textMinScore: number;
   setTextMinScore: (value: number) => void;
+  colorTopK: number;
+  setColorTopK: (value: number) => void;
+  colorMinScore: number;
+  setColorMinScore: (value: number) => void;
 };
 
 const SearchSettingsContext = createContext<Ctx | null>(null);
@@ -34,6 +39,8 @@ export function SearchSettingsProvider({ children }: { children: ReactNode }) {
   const [imageMinScore, setImageMinScore] = useState(DEFAULT_UI_MIN_SCORE);
   const [textTopK, setTextTopK] = useState(DEFAULT_UI_TOP_K);
   const [textMinScore, setTextMinScore] = useState(DEFAULT_UI_MIN_SCORE);
+  const [colorTopK, setColorTopK] = useState(DEFAULT_UI_TOP_K);
+  const [colorMinScore, setColorMinScore] = useState(DEFAULT_COLOR_MIN_SCORE);
 
   const value = useMemo(
     () => ({
@@ -47,8 +54,20 @@ export function SearchSettingsProvider({ children }: { children: ReactNode }) {
       setTextTopK,
       textMinScore,
       setTextMinScore,
+      colorTopK,
+      setColorTopK,
+      colorMinScore,
+      setColorMinScore,
     }),
-    [activeTab, imageTopK, imageMinScore, textTopK, textMinScore],
+    [
+      activeTab,
+      imageTopK,
+      imageMinScore,
+      textTopK,
+      textMinScore,
+      colorTopK,
+      colorMinScore,
+    ],
   );
 
   return (

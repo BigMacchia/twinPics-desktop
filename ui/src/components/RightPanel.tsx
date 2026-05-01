@@ -31,6 +31,10 @@ export function RightPanel() {
     setTextTopK,
     textMinScore,
     setTextMinScore,
+    colorTopK,
+    setColorTopK,
+    colorMinScore,
+    setColorMinScore,
   } = useSearchSettings();
 
   const [tags, setTags] = useState<IndexTagItem[]>([]);
@@ -38,13 +42,18 @@ export function RightPanel() {
   const [tagsError, setTagsError] = useState<string | null>(null);
 
   const isImage = activeTab === "image";
-  const topK = isImage ? imageTopK : textTopK;
-  const minScore = isImage ? imageMinScore : textMinScore;
-  const setTopK = isImage ? setImageTopK : setTextTopK;
-  const setMinScore = isImage ? setImageMinScore : setTextMinScore;
+  const isColor = activeTab === "color";
+  const topK = isImage ? imageTopK : isColor ? colorTopK : textTopK;
+  const minScore = isImage ? imageMinScore : isColor ? colorMinScore : textMinScore;
+  const setTopK = isImage ? setImageTopK : isColor ? setColorTopK : setTextTopK;
+  const setMinScore = isImage
+    ? setImageMinScore
+    : isColor
+      ? setColorMinScore
+      : setTextMinScore;
 
   useEffect(() => {
-    if (activeTab !== "text" || !selectedSourcePath) {
+    if ((activeTab !== "text" && activeTab !== "color") || !selectedSourcePath) {
       setTags([]);
       setTagsError(null);
       setTagsLoading(false);
@@ -95,7 +104,7 @@ export function RightPanel() {
     });
   }, [tags, filterTokens]);
 
-  const showTagList = !isImage && selectedSourcePath;
+  const showTagList = activeTab === "text" && selectedSourcePath;
 
   return (
     <aside
@@ -110,7 +119,7 @@ export function RightPanel() {
           Search options
         </h2>
         <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/90">
-          {isImage ? "Image search" : "Text search"}
+          {isImage ? "Image search" : isColor ? "Color search" : "Text search"}
         </p>
       </div>
       <Separator className="bg-sidebar-border" />

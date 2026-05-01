@@ -13,6 +13,7 @@ pub fn run() {
             commands::search_by_image,
             commands::search_by_text,
             commands::write_temp_image_b64,
+            commands::search_by_colors,
             commands::remove_index,
             commands::remove_all_indices,
         ])
