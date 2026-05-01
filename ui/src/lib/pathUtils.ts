@@ -12,3 +12,8 @@ export function parentFolderName(p: string): string {
   }
   return parts[parts.length - 2] ?? "";
 }
+
+/** Returns true if the path points to a PDF file (case-insensitive). */
+export function isPdf(p: string): boolean {
+  return p.toLowerCase().endsWith(".pdf");
+}

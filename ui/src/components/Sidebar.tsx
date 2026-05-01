@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { Folder, ImageIcon, Loader2, Plus } from "lucide-react";
+import { Folder, ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import appIcon from "@/assets/icon.png";
 import { useIndex } from "@/context/IndexContext";
@@ -30,6 +30,9 @@ export function Sidebar() {
   } = useIndex();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [removingAll, setRemovingAll] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [addProgress, setAddProgress] = useState<{
     total: number;
     done: number;
@@ -47,6 +50,34 @@ export function Sidebar() {
   } | null>(null);
 
   const active = indices.find((i) => i.sourcePath === selectedSourcePath);
+
+  const onRemoveIndex = async (sourcePath: string) => {
+    setRemoveError(null);
+    setRemoving(sourcePath);
+    try {
+      if (sourcePath === selectedSourcePath) setSelectedSourcePath(null);
+      await liveTwinpicsClient.removeIndex({ sourcePath });
+      await refreshIndices();
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const onRemoveAll = async () => {
+    setRemoveError(null);
+    setRemovingAll(true);
+    try {
+      setSelectedSourcePath(null);
+      await liveTwinpicsClient.removeAllIndices();
+      await refreshIndices();
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRemovingAll(false);
+    }
+  };
 
   const onAddIndex = async () => {
     setAddError(null);
@@ -180,6 +211,15 @@ export function Sidebar() {
         </div>
       )}
 
+      {removeError && (
+        <div className="px-3 pt-2">
+          <Alert variant="destructive">
+            <AlertTitle>Could not remove index</AlertTitle>
+            <AlertDescription className="text-xs">{removeError}</AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
           Indices
@@ -277,39 +317,70 @@ export function Sidebar() {
               const isActive = idx.sourcePath === selectedSourcePath;
               const name = basename(idx.sourcePath);
               return (
-                <button
-                  key={idx.sourcePath}
-                  type="button"
-                  onClick={() => setSelectedSourcePath(idx.sourcePath)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-lg border-l-2 border-transparent px-2 py-2.5 text-left text-sm transition-colors",
-                    isActive
-                      ? "border-primary bg-sidebar-accent/80 text-sidebar-foreground shadow-sm ring-1 ring-primary/20"
-                      : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground",
-                  )}
-                >
-                  <Folder
+                <div key={idx.sourcePath} className="group flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSourcePath(idx.sourcePath)}
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      isActive ? "text-primary" : "text-muted-foreground/70",
+                      "flex min-w-0 flex-1 items-center gap-2 rounded-lg border-l-2 border-transparent px-2 py-2.5 text-left text-sm transition-colors",
+                      isActive
+                        ? "border-primary bg-sidebar-accent/80 text-sidebar-foreground shadow-sm ring-1 ring-primary/20"
+                        : "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground",
                     )}
-                    strokeWidth={1.5}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium" title={idx.sourcePath}>
-                      {name}
-                    </p>
-                    <p className="truncate text-[10px] text-muted-foreground/90">
-                      {idx.fileCount.toLocaleString()} items
-                    </p>
-                  </div>
-                </button>
+                  >
+                    <Folder
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        isActive ? "text-primary" : "text-muted-foreground/70",
+                      )}
+                      strokeWidth={1.5}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium" title={idx.sourcePath}>
+                        {name}
+                      </p>
+                      <p className="truncate text-[10px] text-muted-foreground/90">
+                        {idx.fileCount.toLocaleString()} items
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onRemoveIndex(idx.sourcePath)}
+                    disabled={removing === idx.sourcePath || removingAll}
+                    className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 disabled:opacity-50"
+                    title="Remove index"
+                  >
+                    {removing === idx.sourcePath ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    )}
+                  </button>
+                </div>
               );
             })}
         </nav>
       </ScrollArea>
 
       <div className="p-3">
+        {indices.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="mb-2 w-full gap-1.5 text-[10px] font-semibold text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => void onRemoveAll()}
+            disabled={adding || loadingList || removingAll || removing !== null}
+          >
+            {removingAll ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+            )}
+            Remove all indices
+          </Button>
+        )}
         <Card className="border-sidebar-border/60 bg-card/30 shadow-md backdrop-blur-sm">
           <CardContent className="flex items-center gap-2 p-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">

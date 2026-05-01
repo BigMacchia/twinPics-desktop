@@ -51,6 +51,8 @@ export type SearchHit = {
   rank: number;
   score: number;
   path: string;
+  /** 0-based page index; present only for PDF results. */
+  pdfPage?: number;
 };
 
 export type IndexTagItem = {
@@ -89,6 +91,8 @@ export interface TwinpicsClient {
   }): Promise<SearchHit[]>;
   listIndexTags(args: { sourcePath: string }): Promise<IndexTagItem[]>;
   writeTempImage(bytes: Uint8Array): Promise<string>;
+  removeIndex(args: { sourcePath: string }): Promise<void>;
+  removeAllIndices(): Promise<void>;
 }
 
 async function writeTempImageB64(bytes: Uint8Array): Promise<string> {
@@ -116,4 +120,6 @@ export const liveTwinpicsClient: TwinpicsClient = {
   listIndexTags: (args) =>
     invoke("list_index_tags", { sourcePath: args.sourcePath }),
   writeTempImage: (bytes) => writeTempImageB64(bytes),
+  removeIndex: ({ sourcePath }) => invoke("remove_index", { sourcePath }),
+  removeAllIndices: () => invoke("remove_all_indices"),
 };
