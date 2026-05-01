@@ -122,6 +122,9 @@ pub struct SearchHitDto {
     pub rank: usize,
     pub score: f32,
     pub path: String,
+    /// 0-based page index for PDF hits; omitted for regular images.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pdf_page: Option<u32>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -268,6 +271,7 @@ fn search_by_image_work(
             rank: h.rank,
             score: h.score,
             path: h.path.to_string_lossy().to_string(),
+            pdf_page: h.pdf_page,
         })
         .collect())
 }
@@ -313,6 +317,7 @@ fn search_by_text_work(
             rank: h.rank,
             score: h.score,
             path: h.path.to_string_lossy().to_string(),
+            pdf_page: h.pdf_page,
         })
         .collect())
 }
@@ -328,6 +333,26 @@ pub async fn search_by_text(
     let backend = state.backend()?;
     tokio::task::spawn_blocking(move || {
         search_by_text_work(source_path, tags, min_score, top_k, backend)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn remove_index(source_path: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        twinpics_core::clean_project(std::path::Path::new(&source_path))
+            .map_err(|e: twinpics_core::CoreError| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn remove_all_indices() -> Result<(), String> {
+    tokio::task::spawn_blocking(|| {
+        twinpics_core::clean_all_projects()
+            .map_err(|e: twinpics_core::CoreError| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?

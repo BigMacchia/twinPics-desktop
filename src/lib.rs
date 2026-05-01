@@ -13,6 +13,8 @@ pub fn run() {
             commands::search_by_image,
             commands::search_by_text,
             commands::write_temp_image_b64,
+            commands::remove_index,
+            commands::remove_all_indices,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
